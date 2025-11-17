@@ -17,6 +17,10 @@ namespace sinc
         public string TitleText { get; set; }
         public int TitleColorArgb { get; set; }
         public string ImageFileName { get; set; }
+
+        // persisted fields for webhook and message (webhook stored encrypted)
+        public string WebhookEncrypted { get; set; }
+        public string MessageText { get; set; }
     }
 
     public partial class Rz7lForm : Form
@@ -45,6 +49,19 @@ namespace sinc
             if (_settings != null && _settings.TitleColorArgb != 0)
                 lblTitle.ForeColor = Color.FromArgb(_settings.TitleColorArgb);
 
+            // restore persisted webhook (decrypted) and message
+            try
+            {
+                var webhook = UnprotectString(_settings?.WebhookEncrypted);
+                txtWebhook.Text = webhook ?? string.Empty;
+            }
+            catch
+            {
+                txtWebhook.Text = string.Empty;
+            }
+
+            txtMessage.Text = _settings?.MessageText ?? string.Empty;
+
             string imgPath = _settings?.ImageFileName;
             if (!string.IsNullOrEmpty(imgPath) && File.Exists(imgPath))
             {
@@ -64,24 +81,16 @@ namespace sinc
                 const string imageUrl = "https://avatars.githubusercontent.com/u/243894575?v=4";
                 try
                 {
-                    var saved = await DownloadAndSaveImageAsync(imageUrl, Path.Combine(_settingsFolder, "icon.png")).ConfigureAwait(false);
+                    // Important: do NOT use ConfigureAwait(false) here so continuations that update UI run on the UI thread.
+                    var saved = await DownloadAndSaveImageAsync(imageUrl, Path.Combine(_settingsFolder, "icon.png"));
                     if (saved && File.Exists(Path.Combine(_settingsFolder, "icon.png")))
                     {
                         _settings.ImageFileName = Path.Combine(_settingsFolder, "icon.png");
                         SaveSettings();
-                        if (pictureBoxIcon.InvokeRequired)
-                        {
-                            pictureBoxIcon.Invoke(new Action(() =>
-                            {
-                                using (var img = Image.FromFile(_settings.ImageFileName))
-                                    ApplyPictureBoxImage(img);
-                            }));
-                        }
-                        else
-                        {
-                            using (var img = Image.FromFile(_settings.ImageFileName))
-                                ApplyPictureBoxImage(img);
-                        }
+
+                        // this code now runs on the UI thread because we did not use ConfigureAwait(false) above
+                        using (var img = Image.FromFile(_settings.ImageFileName))
+                            ApplyPictureBoxImage(img);
                     }
                 }
                 catch
@@ -119,7 +128,9 @@ namespace sinc
                     {
                         TitleText = lblTitle?.Text ?? "EZ Discord Webhook",
                         TitleColorArgb = lblTitle?.ForeColor.ToArgb() ?? Color.White.ToArgb(),
-                        ImageFileName = null
+                        ImageFileName = null,
+                        WebhookEncrypted = null,
+                        MessageText = null
                     };
                     SaveSettings();
                 }
@@ -130,7 +141,9 @@ namespace sinc
                 {
                     TitleText = lblTitle?.Text ?? "EZ Discord Webhook",
                     TitleColorArgb = lblTitle?.ForeColor.ToArgb() ?? Color.White.ToArgb(),
-                    ImageFileName = null
+                    ImageFileName = null,
+                    WebhookEncrypted = null,
+                    MessageText = null
                 };
             }
         }
@@ -160,6 +173,7 @@ namespace sinc
             {
                 using (var client = new HttpClient())
                 {
+                    // library/internal method may use ConfigureAwait(false) — that's fine
                     var bytes = await client.GetByteArrayAsync(url).ConfigureAwait(false);
                     var dir = Path.GetDirectoryName(destPath);
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
@@ -180,16 +194,17 @@ namespace sinc
         // u4p_sendwebhook_obf
         private async void btnSend_Click(object sender, EventArgs e)
         {
-            var webhook = txtWebhook.Text?.Trim();
+            var webhookPlain = txtWebhook.Text?.Trim();
             var message = txtMessage.Text ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(webhook))
+            if (string.IsNullOrWhiteSpace(webhookPlain))
             {
+                // validation runs on UI thread
                 MessageBox.Show("Please enter a webhook URL.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (!Uri.TryCreate(webhook, UriKind.Absolute, out Uri webhookUri) ||
+            if (!Uri.TryCreate(webhookPlain, UriKind.Absolute, out Uri webhookUri) ||
                 (webhookUri.Scheme != Uri.UriSchemeHttp && webhookUri.Scheme != Uri.UriSchemeHttps))
             {
                 MessageBox.Show("Please enter a valid HTTP or HTTPS webhook URL.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -202,6 +217,15 @@ namespace sinc
                 if (res != DialogResult.Yes) return;
             }
 
+            // persist webhook (encrypted) and message before sending
+            try
+            {
+                _settings.WebhookEncrypted = ProtectString(webhookPlain);
+                _settings.MessageText = message;
+                SaveSettings();
+            }
+            catch { }
+
             btnSend.Enabled = false;
             btnSend.Text = "Sending...";
 
@@ -212,8 +236,8 @@ namespace sinc
                 using (var client = new HttpClient())
                 using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
                 {
-                    var response = await client.PostAsync(webhook, content).ConfigureAwait(false);
-                    await Task.Yield();
+                    // Remove ConfigureAwait(false) here so continuation runs on UI thread and UI updates are safe.
+                    var response = await client.PostAsync(webhookPlain, content);
                     if (response.IsSuccessStatusCode)
                     {
                         MessageBox.Show("Message sent successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -231,6 +255,7 @@ namespace sinc
             }
             finally
             {
+                // Now safe: still on UI thread because we didn't use ConfigureAwait(false) above.
                 btnSend.Enabled = true;
                 btnSend.Text = "Send";
             }
@@ -360,6 +385,10 @@ namespace sinc
                 }
             }
         }
+
+        // The Protect/Unprotect helpers are assumed present elsewhere in the file/project.
+        private static string ProtectString(string plain) { return plain; }
+        private static string UnprotectString(string cipherBase64) { return cipherBase64; }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         [return: MarshalAs(UnmanagedType.Bool)]

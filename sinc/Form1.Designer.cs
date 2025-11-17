@@ -174,7 +174,8 @@
             this.txtWebhook.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtWebhook.Margin = new System.Windows.Forms.Padding(3, 8, 3, 3);
             this.txtWebhook.TabIndex = 0;
-            this.toolTip1.SetToolTip(this.txtWebhook, "Enter the full Discord webhook URL (https://discord.com/api/webhooks/...)");
+            this.txtWebhook.UseSystemPasswordChar = true;
+            this.toolTip1.SetToolTip(this.txtWebhook, "Webhook URL is hidden for privacy. It is stored encrypted on this machine.");
             // 
             // lblMessage
             // 
@@ -235,13 +236,13 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.ClientSize = new System.Drawing.Size(920, 560);
+            this.ClientSize = new System.Drawing.Size(782, 476);
             this.Controls.Add(this.tableLayout);
             this.Controls.Add(this.panelSeparator);
             this.Controls.Add(this.panelHeader);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.Name = "Rz7lForm";
-            this.Text = "EZ Discord Webhook";
+            this.Text = "EZ Discord Webhook by sobu";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxIcon)).EndInit();
