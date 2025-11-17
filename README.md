@@ -1,6 +1,8 @@
 ## You can download the exe or build it yourself! its really simple.
 
 
+<img width="779" height="423" alt="c" src="https://github.com/user-attachments/assets/63c852d7-2a22-4efa-a61b-ce4fc8c87779" />
+
 ## Key features
 - Send plain-text messages to a Discord webhook (HTTP/HTTPS).
 - Header customization: edit the title text and pick a color.
