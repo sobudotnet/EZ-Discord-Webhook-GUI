@@ -1,3 +1,6 @@
+## You can download the exe or build it yourself! its really simple.
+
+
 ## Key features
 - Send plain-text messages to a Discord webhook (HTTP/HTTPS).
 - Header customization: edit the title text and pick a color.
